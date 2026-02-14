@@ -1,10 +1,10 @@
 package main
 
 import (
-	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/google/uuid"
@@ -38,23 +38,16 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 	r.ParseMultipartForm(maxMemory)
 
 	// Get the file data from the form
-	file, header, err := r.FormFile("thumbnail")
+	data, header, err := r.FormFile("thumbnail")
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Couldn't get file from form", err)
 		return
 	}
-	defer file.Close()
+	defer data.Close()
 
 	mediaType := header.Header.Get("Content-Type")
 	if mediaType == "" {
 		respondWithError(w, http.StatusBadRequest, "Missing Content-Type for thumbnail", nil)
-		return
-	}
-
-	// Read the file data
-	imgData, err := io.ReadAll(file)
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Couldn't read file data", err)
 		return
 	}
 
@@ -69,13 +62,28 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		respondWithError(w, http.StatusUnauthorized, "You don't have permission to upload a thumbnail for this video", nil)
 		return
 	}
+
+	// Generate a unique filename for the thumbnail and get the disk path to save it
+	assetPath := getAssetPath(videoID, mediaType)
+	assetDiskPath := cfg.getAssetDiskPath(assetPath)
 	
-	// Encode the image data as a base64 string
-	imgDataBase64 := base64.StdEncoding.EncodeToString(imgData)
-	// Create a data URI for the thumbnail and save it in the video metadata
-	thumbnailDataURI := fmt.Sprintf("data:%s;base64,%s", mediaType, imgDataBase64)
+	// Save the file to the server's filesystem
+	file, err := os.Create(assetDiskPath)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't create thumbnail file on server", err)
+		return
+	}
+	defer file.Close()
+
+	if _, err := io.Copy(file, data); err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't save thumbnail file on server", err)
+		return
+	}
+
+	// Create a public URL for the fileserver for the thumbnail and update the video metadata in the database
+	thumbnailURL := cfg.getAssetURL(assetPath)
 	
-	vidMetadata.ThumbnailURL = &thumbnailDataURI
+	vidMetadata.ThumbnailURL = &thumbnailURL
 
 	// Update the video metadata in the database with the thumbnail URL
 	if err := cfg.db.UpdateVideo(vidMetadata); err != nil {
