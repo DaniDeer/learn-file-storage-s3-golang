@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
@@ -31,7 +32,59 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 
 	fmt.Println("uploading thumbnail for video", videoID, "by user", userID)
 
-	// TODO: implement the upload here
+	// Parsing multipart/form-data request
+	const maxMemory = 10 << 20 // Byte-shift number 10 to the left by 20 places (10 MB)
+	r.ParseMultipartForm(maxMemory)
 
-	respondWithJSON(w, http.StatusOK, struct{}{})
+	// Get the file data from the form
+	file, header, err := r.FormFile("thumbnail")
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Couldn't get file from form", err)
+		return
+	}
+	defer file.Close()
+
+	mediaType := header.Header.Get("Content-Type")
+	if mediaType == "" {
+		respondWithError(w, http.StatusBadRequest, "Missing Content-Type for thumbnail", nil)
+		return
+	}
+
+	// Read the file data
+	imgData, err := io.ReadAll(file)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't read file data", err)
+		return
+	}
+
+	// Get video metadata from DB and check if user has permission to upload thumbnail for this video
+	vidMetadata, err := cfg.db.GetVideo(videoID)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't get video metadata", err)
+		return
+	}
+
+	if vidMetadata.UserID != userID {
+		respondWithError(w, http.StatusUnauthorized, "You don't have permission to upload a thumbnail for this video", nil)
+		return
+	}
+
+	// Save the thumbnail in global map
+	videoThumbnails[videoID] = thumbnail{
+		data:      imgData,
+		mediaType: mediaType,
+	}
+	
+	thumbnailURL := fmt.Sprintf("http://localhost:%s/api/thumbnails/%s", cfg.port, videoID)
+	vidMetadata.ThumbnailURL = &thumbnailURL
+
+	// Update the video metadata in the database with the thumbnail URL
+	if err := cfg.db.UpdateVideo(vidMetadata); err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't update video metadata with thumbnail URL", err)
+		return
+	}
+
+	// Respond with the updated video metadata
+	respondWithJSON(w, http.StatusOK, vidMetadata)
+
 }
