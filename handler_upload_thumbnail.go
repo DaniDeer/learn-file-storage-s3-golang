@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
@@ -68,15 +69,13 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		respondWithError(w, http.StatusUnauthorized, "You don't have permission to upload a thumbnail for this video", nil)
 		return
 	}
-
-	// Save the thumbnail in global map
-	videoThumbnails[videoID] = thumbnail{
-		data:      imgData,
-		mediaType: mediaType,
-	}
 	
-	thumbnailURL := fmt.Sprintf("http://localhost:%s/api/thumbnails/%s", cfg.port, videoID)
-	vidMetadata.ThumbnailURL = &thumbnailURL
+	// Encode the image data as a base64 string
+	imgDataBase64 := base64.StdEncoding.EncodeToString(imgData)
+	// Create a data URI for the thumbnail and save it in the video metadata
+	thumbnailDataURI := fmt.Sprintf("data:%s;base64,%s", mediaType, imgDataBase64)
+	
+	vidMetadata.ThumbnailURL = &thumbnailDataURI
 
 	// Update the video metadata in the database with the thumbnail URL
 	if err := cfg.db.UpdateVideo(vidMetadata); err != nil {
