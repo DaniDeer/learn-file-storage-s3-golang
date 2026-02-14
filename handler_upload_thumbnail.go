@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"os"
 
@@ -60,6 +61,20 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 
 	if vidMetadata.UserID != userID {
 		respondWithError(w, http.StatusUnauthorized, "You don't have permission to upload a thumbnail for this video", nil)
+		return
+	}
+
+	mimeType, _, err := mime.ParseMediaType(mediaType)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid Content-Type for thumbnail", err)
+		return
+	}
+
+	switch mimeType {
+	case "image/jpeg", "image/png, image/gif":
+		// valid media type for thumbnail
+	default:
+		respondWithError(w, http.StatusBadRequest, "Unsupported media type for thumbnail. Supported types are image/jpeg, image/png, and image/gif.", nil)
 		return
 	}
 
