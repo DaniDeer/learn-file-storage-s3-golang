@@ -71,7 +71,7 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 	}
 
 	switch mimeType {
-	case "image/jpeg", "image/png, image/gif":
+	case "image/jpeg", "image/png", "image/gif":
 		// valid media type for thumbnail
 	default:
 		respondWithError(w, http.StatusBadRequest, "Unsupported media type for thumbnail. Supported types are image/jpeg, image/png, and image/gif.", nil)
