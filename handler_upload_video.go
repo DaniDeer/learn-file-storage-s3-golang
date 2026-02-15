@@ -106,8 +106,15 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// Determine aspect ratio of the video
+	aspectRatioCategory, err := getVideoAspectRatio(file.Name())
+	if err != nil {
+		// set to other if we can't determine the aspect ratio, but don't fail the upload
+		aspectRatioCategory = "other"
+	}
+
 	// Generate key for the S3 object using random-32-byte-hex string
-	key, err := getAssetPath(mediaType)
+	key, err := getAssetPath(mediaType, aspectRatioCategory) // use aspect ratio category as prefix for better organization in S3 bucket
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't generate S3 object key", err)
 		return
