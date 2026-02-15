@@ -36,6 +36,8 @@ brew install sqlite3
 
 - [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
 
+- [AWS Go SDK](https://github.com/aws/aws-sdk-go-v2)
+
 ## 2. Download sample images and videos
 
 ```bash

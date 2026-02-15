@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/rand"
-	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -16,15 +15,15 @@ func (cfg apiConfig) ensureAssetsDir() error {
 }
 
 func getAssetPath(mediaType string) (string, error) {
-	// Generate a random 32 byte slice 
-	rand32Bytes := make([]byte, 32)
-	_, err := rand.Read(rand32Bytes)
+	// Generate a random 16 byte slice 
+	rand16Bytes := make([]byte, 16)
+	_, err := rand.Read(rand16Bytes)
 	if err != nil {
 		return "", fmt.Errorf("couldn't generate random bytes for thumbnail filename: %w", err)
 	}
 
-	// Encode the random bytes to a base64 string to use as the asset name
-	fileName := base64.RawURLEncoding.EncodeToString(rand32Bytes)
+	// Encode the random bytes to a hex string to use as the asset name
+	fileName := fmt.Sprintf("%x", rand16Bytes)
 	
 	ext := mediaTypeToExtension(mediaType)
 	return fmt.Sprintf("%s.%s", fileName, ext), nil
@@ -38,6 +37,10 @@ func (cfg apiConfig) getAssetURL(assetPath string) string {
 	return fmt.Sprintf("http://localhost:%s/assets/%s", cfg.port, assetPath)
 }
 
+func (cfg apiConfig) getObjectURL(key string) string {
+	return fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", cfg.s3Bucket, cfg.s3Region, key)
+}
+
 func mediaTypeToExtension(mediaType string) string {
 	switch mediaType {
 	case "image/jpeg":
@@ -46,6 +49,8 @@ func mediaTypeToExtension(mediaType string) string {
 		return "png"
 	case "image/gif":
 		return "gif"
+	case "video/mp4":
+		return "mp4"
 	default:
 		return "bin" // default to .bin for unknown media types
 	}
