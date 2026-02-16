@@ -98,6 +98,22 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// Process the video for fast start streaming
+	processedFilePath, err := processVidoForFastStart(file.Name())
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't process video for fast start", err)
+		return
+	}
+	// Read the processed video file for uploading to S3
+	processedFile, err := os.Open(processedFilePath)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't open processed video file", err)
+		return
+	}
+	defer processedFile.Close() // ensure the processed file is closed after we're done
+	defer os.Remove(processedFilePath) // clean up the processed file after we're done
+
+	
 	// Upload the video file to S3
 
 	// Reset the file pointer to the beginning of the file before uploading to S3
@@ -107,7 +123,7 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Determine aspect ratio of the video
-	aspectRatioCategory, err := getVideoAspectRatio(file.Name())
+	aspectRatioCategory, err := getVideoAspectRatio(processedFile.Name())
 	if err != nil {
 		// set to other if we can't determine the aspect ratio, but don't fail the upload
 		aspectRatioCategory = "other"
@@ -124,7 +140,7 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	input := &s3.PutObjectInput{
 		Bucket:      aws.String(cfg.s3Bucket),      // env variable for S3 bucket name
 		Key:         aws.String(key),               // use the generated key as the S3 object key
-		Body:        file,    							 				// the video file to upload
+		Body:        processedFile,    							 				// the video file to upload
 		ContentType: aws.String(mediaType),         // set the Content-Type metadata for the S3 object
 	}
 
@@ -147,4 +163,3 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	respondWithJSON(w, http.StatusOK, vidMetadata)
 
 }
-

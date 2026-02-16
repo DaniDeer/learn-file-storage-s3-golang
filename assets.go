@@ -117,3 +117,31 @@ func getVideoAspectRatio(filePath string) (string, error) {
 	return "other", nil
 
 }
+
+
+// processVidoForFastStart takes a file path as input and creates and returns a new path to a file with "fast start" encoding.
+func processVidoForFastStart(filePath string) (string, error) {
+
+	// The input file path is: /var/www/assets/abc123.mp4
+	// We want the output file path to be: /var/www/assets/abc123.processing.mp4
+	ext := filepath.Ext(filePath) // .mp4
+	base := filePath[:len(filePath)-len(ext)] // /var/www/assets/abc123
+	outputFilepath := fmt.Sprintf("%s.processing%s", base, ext) // /var/www/assets/abc123.processing.mp4
+
+	// Use ffmpeg to process the video for fast start streaming
+	_, err := exec.Command("ffmpeg", "-i", filePath, "-c", "copy", "-movflags", "faststart", "-f", "mp4", outputFilepath).Output()
+	if err != nil {
+		return "", fmt.Errorf("ffmpeg command failed: %w", err)
+	}
+
+	fileInfo, err := os.Stat(outputFilepath)
+	if err != nil {
+		return "", fmt.Errorf("couldn't stat processed video file: %w", err)
+	}
+
+	if fileInfo.Size() == 0 {
+		return "", fmt.Errorf("processed video file is empty, something went wrong with ffmpeg processing")
+	}
+
+	return outputFilepath, nil
+}
