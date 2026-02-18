@@ -2,6 +2,13 @@
 
 This repo contains the starter code for the Tubely application - the #1 tool for engagement bait - for the "Learn File Servers and CDNs with S3 and CloudFront" [course](https://www.boot.dev/courses/learn-file-servers-s3-cloudfront-golang) on [boot.dev](https://www.boot.dev)
 
+**Learnings**
+
+- Handle streaming content in HTTP (uploads, downloads, caching)
+- Use the `ffmpeg` executable to handle data for video streaming (despite from its LGPL licence you can execute this dependency with `exec.command()` in GO)
+- How to use a `signed URL` for handling private files in an object store like `S3` (see commit [7eeb5ee](https://github.com/DaniDeer/learn-file-storage-s3-golang/commit/7eeb5ee8ea172dc843778f5640cad1e5621f3ebe))
+- Use `CloudFront` as a `CDN` in front of your object store. It is basically a globally, distributed cache and hides the services (like `S3`) from attackers and malicious activities.
+
 ## Quickstart
 
 *This is to be used as a *reference\* in case you need it, you should follow the instructions in the course rather than trying to do everything here.

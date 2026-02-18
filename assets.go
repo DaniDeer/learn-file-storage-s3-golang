@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
@@ -9,12 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
-	"time"
-
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/database"
 )
 
 func (cfg apiConfig) ensureAssetsDir() error {
@@ -151,56 +144,4 @@ func processVidoForFastStart(filePath string) (string, error) {
 	}
 
 	return outputFilepath, nil
-}
-
-
-// generatePresignedURL generates a presigned URL for an S3 object using the AWS SDK for Go v2. 
-// It takes the S3 client, bucket name, object key, and expiration time as parameters and returns the generated presigned URL or an error if the generation fails.
-func generatePresignedURL(s3Client *s3.Client, bucket, key string, expireTime time.Duration) (string, error) {
-
-	// Create a presign client from the S3 client
-	presignedClient := s3.NewPresignClient(s3Client)
-
-	// Generate a presigned URL for the S3 object using the GetObject operation
-	input := &s3.GetObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(key),
-	}
-
-	// Use the presigned client and the GetObjectInput to generate a presigned URL that expires after the specified duration
-	presignedRequest, err := presignedClient.PresignGetObject(context.Background(), input, s3.WithPresignExpires(expireTime))
-	if err != nil {
-		return "", fmt.Errorf("failed to generate presigned URL: %w", err)
-	}
-
-	// Return the generated presigned URL
-	return presignedRequest.URL, nil
-
-}
-
-// dbVideoToSignedVideo takes a Video struct from the database and generates a presigned URL for the video if it has a VideoURL (which contains the S3 bucket and key).
-// It returns a new Video struct with the VideoURL field updated to contain the presigned URL instead of the S3 bucket and key.
-func (cfg *apiConfig) dbVideoToSignedVideo(video database.Video) (database.Video, error) {
-	if video.VideoURL == nil {
-		return video, nil // if there's no video URL, just return the video as is
-	}
-
-	parts := strings.Split(*video.VideoURL, ",")
-	if len(parts) != 2 {
-		return video, nil // if the VideoURL doesn't contain both bucket and key, return the video as is without generating a presigned URL
-	}
-
-	// URL has format: bucket, key (e.g. "my-bucket,abc123.mp4")
-	bucket, key := parts[0], parts[1]
-
-	// Generate a presigned URL for the S3 object using the key
-	presignedURL, err := generatePresignedURL(cfg.s3Client, bucket, key, 15*time.Minute) // presigned URL expires in 15 minutes
-	if err != nil {
-		return video, err
-	}
-
-	// Update the VideoURL field with the generated presigned URL
-	video.VideoURL = &presignedURL
-
-	return video, nil
 }

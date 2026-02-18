@@ -150,16 +150,11 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Store the S3 bucket and key in the database as a comma-separated string in the VideoURL field (e.g. "my-bucket,key").
-	// Now we can generate presigned URLs for the video when retrieving video metadata without exposing the S3 bucket and key directly in the API response
-	vidMetadata.VideoURL = aws.String(fmt.Sprintf("%s,%s", cfg.s3Bucket, key))
+	// Set videoURL to the CloudFront URL for the uploaded video
+	videoURL := fmt.Sprintf("https://%s/%s", cfg.s3CfDistribution, key)
+	vidMetadata.VideoURL = &videoURL
 
-	vidMetadata, err = cfg.dbVideoToSignedVideo(vidMetadata) // generate a presigned URL for the video and update the VideoURL field with the presigned URL
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Couldn't generate presigned URL for video", err)
-		return
-	}
-
+	// Update the video metadata in the database with the new video URL
 	if err := cfg.db.UpdateVideo(vidMetadata); err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't update video metadata with thumbnail URL", err)
 		return
@@ -169,5 +164,3 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	respondWithJSON(w, http.StatusOK, vidMetadata)
 
 }
-
-
